@@ -1,0 +1,107 @@
+name: Update smolvm formula
+
+# Keeps Formula/smolvm.rb pinned to the latest smolvm release (version + the
+# per-platform sha256s) so `brew install smol-machines/tap/smolvm` never goes
+# stale. Zero setup: it polls the smol-machines/smolvm releases on a schedule
+# and commits any bump with the built-in token.
+#
+# Triggers:
+#   - schedule: a new release is picked up within a few hours automatically.
+#   - workflow_dispatch: run it now (optionally pin a specific version).
+#   - repository_dispatch (type: smolvm-release): optional INSTANT bump — have
+#     smolvm's release workflow send `{"event_type":"smolvm-release",
+#     "client_payload":{"version":"1.6.0"}}` with a token that can dispatch here.
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "smolvm version to pin (e.g. 1.5.0). Blank = latest release."
+        required: false
+        default: ""
+  repository_dispatch:
+    types: [smolvm-release]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-formula
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target and current version
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          DISPATCH_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+          VER="${INPUT_VERSION:-${DISPATCH_VERSION:-}}"
+          if [ -z "$VER" ]; then
+            VER="$(gh release view --repo smol-machines/smolvm --json tagName -q .tagName)"
+          fi
+          VER="${VER#v}"
+          CUR="$(sed -nE 's/^[[:space:]]*version "([^"]+)".*/\1/p' Formula/smolvm.rb | head -1)"
+          echo "target=$VER" >> "$GITHUB_OUTPUT"
+          echo "current=$CUR" >> "$GITHUB_OUTPUT"
+          echo "smolvm latest: $VER | formula: $CUR"
+
+      - name: Update formula
+        if: steps.resolve.outputs.target != steps.resolve.outputs.current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.resolve.outputs.target }}
+        run: |
+          set -euo pipefail
+          gh release download "v$VER" --repo smol-machines/smolvm \
+            --pattern checksums.sha256 --dir /tmp --clobber
+          sha() { grep " smolvm-$VER-$1.tar.gz\$" /tmp/checksums.sha256 | awk '{print $1}'; }
+          DARWIN_ARM="$(sha darwin-arm64)"
+          LINUX_ARM="$(sha linux-arm64)"
+          LINUX_X86="$(sha linux-x86_64)"
+          for v in "$DARWIN_ARM" "$LINUX_ARM" "$LINUX_X86"; do
+            [ -n "$v" ] || { echo "::error::missing checksum for a platform in v$VER"; exit 1; }
+          done
+          python3 - "$VER" "$DARWIN_ARM" "$LINUX_ARM" "$LINUX_X86" <<'PY'
+          import re, sys
+          ver, d_arm, l_arm, l_x86 = sys.argv[1:5]
+          p = "Formula/smolvm.rb"
+          s = open(p).read()
+          s = re.sub(r'(^\s*version ")[^"]+(")', rf'\g<1>{ver}\g<2>', s, count=1, flags=re.M)
+          def set_sha(s, platform, sha):
+              pat = r'(url "[^"]*' + re.escape(platform) + r'\.tar\.gz"\s*\n\s*sha256 ")[0-9a-f]{64}(")'
+              new, n = re.subn(pat, rf'\g<1>{sha}\g<2>', s, count=1)
+              assert n == 1, f"no sha256 line found for {platform}"
+              return new
+          for plat, sha in [("darwin-arm64", d_arm), ("linux-arm64", l_arm), ("linux-x86_64", l_x86)]:
+              s = set_sha(s, plat, sha)
+          open(p, "w").write(s)
+          print(f"pinned smolvm {ver}")
+          PY
+          ruby -c Formula/smolvm.rb
+          if command -v brew >/dev/null; then brew style Formula/smolvm.rb; fi
+
+      - name: Commit and push
+        if: steps.resolve.outputs.target != steps.resolve.outputs.current
+        env:
+          VER: ${{ steps.resolve.outputs.target }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Formula/smolvm.rb; then
+            echo "formula already up to date; nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/smolvm.rb
+          git commit -m "Update smolvm to $VER"
+          git push
