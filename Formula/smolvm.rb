@@ -49,6 +49,36 @@ class Smolvm < Formula
                        libexec/"lib/libkrun.so.1"
   end
 
+  # The release tarball's dylibs are already self-contained (@rpath / @loader_path
+  # sibling references). Homebrew's automatic dylib relocation, however, rewrites
+  # some of those sibling refs (libepoxy, virglrenderer) to absolute
+  # /opt/homebrew/opt/<formula>/lib paths — which point at formulae/taps the user
+  # doesn't have (hence the "requires the tap slp/krun" warning) and only resolve
+  # on a machine that happens to have those libs installed. Re-point every
+  # dependency that has a bundled sibling back to @loader_path so the bundle is
+  # self-contained again, then re-sign (relocation invalidated the ad-hoc
+  # signature). Runs after Homebrew's relocation, so it's the last word.
+  def post_install
+    return unless OS.mac?
+
+    lib = libexec/"lib"
+    bundled = Dir[lib/"*.dylib"].map { |f| File.basename(f) }
+    Dir[lib/"*.dylib"].each do |dylib|
+      changed = false
+      MachO.open(dylib).linked_dylibs.each do |dep|
+        next if dep.start_with?("@")
+
+        base = File.basename(dep)
+        next unless bundled.include?(base)
+
+        MachO::Tools.change_install_name(dylib, dep, "@loader_path/#{base}")
+        changed = true
+      end
+      # ruby-macho invalidates the ad-hoc signature; re-sign so dyld will load it.
+      MachO.codesign!(dylib) if changed
+    end
+  end
+
   def caveats
     <<~EOS
       smolvm runs real microVMs, so it needs hardware virtualization:
