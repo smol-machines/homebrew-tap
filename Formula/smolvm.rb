@@ -1,7 +1,7 @@
 class Smolvm < Formula
   desc "OCI-native microVM runtime with sub-200ms boot"
   homepage "https://github.com/smol-machines/smolvm"
-  version "1.19.0"
+  version "1.19.1"
   license "Apache-2.0"
 
   # smolvm formats ext4 storage disks with mkfs.ext4, which isn't native on macOS.
@@ -13,7 +13,7 @@ class Smolvm < Formula
   on_macos do
     on_arm do
       url "https://github.com/smol-machines/smolvm/releases/download/v#{version}/smolvm-#{version}-darwin-arm64.tar.gz"
-      sha256 "8b2eaafdf15734b87a9f92aa837c79afa8bb351e183b7cd4f2205ffcd0f0cc85"
+      sha256 "ea0715c94210e76565e9df8efb94cf19e1ff6fd28ecc55c404dbbd4871aed87b"
     end
     # No macOS x86_64 build — smolvm targets Apple Silicon (Hypervisor.framework).
   end
@@ -21,11 +21,11 @@ class Smolvm < Formula
   on_linux do
     on_arm do
       url "https://github.com/smol-machines/smolvm/releases/download/v#{version}/smolvm-#{version}-linux-arm64.tar.gz"
-      sha256 "bf304852e4c892a0f0c37d5b8c698aa5012b758b1ba0fcef147f6e7438b055ce"
+      sha256 "d108905706a0c14b763b766f9aec124af8b3ebf0482b117f33167110e4195e1f"
     end
     on_intel do
       url "https://github.com/smol-machines/smolvm/releases/download/v#{version}/smolvm-#{version}-linux-x86_64.tar.gz"
-      sha256 "4feb274fd24d4722d718b9c85881fb9bba3c0c9f8123f67584436065bf583311"
+      sha256 "9b67d0200948c95efb5d696a4cf94f27be303e29cf44af5bf72ca4234a1de738"
     end
 
     # The Linux libkrun.so.1 ships without a RUNPATH, so smolvm-bin can't find
