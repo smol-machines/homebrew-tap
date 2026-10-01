@@ -87,7 +87,7 @@ class Smolvm < Formula
             sudo usermod -aG kvm "$USER"   # then log out and back in
 
       Get started:
-        smolvm run alpine echo hello
+        smolvm machine run --net --image alpine -- echo hello
     EOS
   end
 

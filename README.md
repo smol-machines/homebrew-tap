@@ -33,5 +33,5 @@ its binary, the libkrun libraries, and the guest agent rootfs) into Homebrew's
 Cellar and links `smolvm` onto your `PATH`:
 
 ```sh
-smolvm run alpine echo hello
+smolvm machine run --net --image alpine -- echo hello
 ```
