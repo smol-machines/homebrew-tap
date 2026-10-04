@@ -1,5 +1,5 @@
 class Smolvm < Formula
-  desc "OCI-native microVM runtime with sub-200ms boot"
+  desc "Branchable microVMs for AI agents"
   homepage "https://github.com/smol-machines/smolvm"
   version "1.23.1"
   license "Apache-2.0"
