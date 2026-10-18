@@ -1,6 +1,16 @@
 # smol machines Homebrew tap
 
-Homebrew formula for [smolvm](https://github.com/smol-machines/smolvm) — the
+Homebrew formulas for [smol](https://github.com/smol-machines/smol), the CLI, and
+[smolvm](https://github.com/smol-machines/smolvm), the engine it embeds.
+
+Most people want `smol`:
+
+```bash
+brew install smol-machines/tap/smol
+smol run python:3.12 -- python -c 'print("hello from a microVM")'
+```
+
+The engine on its own (servers, embedding) is [smolvm](https://github.com/smol-machines/smolvm) — the
 OCI-native microVM runtime with sub-200ms boot.
 
 ## Install
